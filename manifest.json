@@ -1,17 +1,63 @@
 {
   "name": "Classroom Gamification",
-  "short_name": "Gamification",
-  "start_url": "./index.html",
+  "short_name": "Classroom",
+  "description": "Plataforma Interativa de Jogos Educacionais",
+  "start_url": "/",
+  "scope": "/",
   "display": "standalone",
+  "orientation": "portrait-primary",
   "background_color": "#0d2444",
-  "theme_color": "#0d2444",
-  "orientation": "any",
+  "theme_color": "#ffd447",
   "icons": [
     {
-      "src": "SUPERFLWORD.png",
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-maskable.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
     }
-  ]
+  ],
+  "screenshots": [
+    {
+      "src": "/screenshot-1.png",
+      "sizes": "540x720",
+      "type": "image/png",
+      "form_factor": "narrow"
+    },
+    {
+      "src": "/screenshot-wide.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Português",
+      "short_name": "Português",
+      "description": "Acesse jogos de Língua Portuguesa",
+      "url": "/?disciplina=1",
+      "icons": [{ "src": "/icon-pt.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Matemática",
+      "short_name": "Matemática",
+      "description": "Acesse jogos de Matemática",
+      "url": "/?disciplina=6",
+      "icons": [{ "src": "/icon-math.png", "sizes": "192x192" }]
+    }
+  ],
+  "categories": ["education", "games"],
+  "prefer_related_applications": false
 }
