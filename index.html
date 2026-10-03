@@ -420,34 +420,58 @@
 </div>
 
 <script>
-// BASE DE DADOS
-let disciplinas = [
-  { id: 999, area: "EXAME NACIONAL DO ENSINO MÉDIO", nome: "JOGOS ENEM", icone: "📝", cor: "var(--gold)", jogos: [] },
-  { id: 1, area: "LINGUAGENS E SUAS TECNOLOGIAS", nome: "LÍNGUA PORTUGUESA", icone: "💬", cor: "var(--pink-icon)", jogos: [
-      { id: 101, nome: "SUPER FL WORLD V3", url: "superflworldv3.html", capa: "", excluido: false }
-  ]},
-  { id: 2, area: "LINGUAGENS E SUAS TECNOLOGIAS", nome: "ARTE", icone: "🎨", cor: "var(--pink-icon)", jogos: [] },
-  { id: 3, area: "LINGUAGENS E SUAS TECNOLOGIAS", nome: "EDUCAÇÃO FÍSICA", icone: "🏃", cor: "var(--pink-icon)", jogos: [] },
-  { id: 4, area: "LINGUAGENS E SUAS TECNOLOGIAS", nome: "LÍNGUA INGLESA", icone: "🌐", cor: "var(--pink-icon)", jogos: [] },
-  { id: 5, area: "LINGUAGENS E SUAS TECNOLOGIAS", nome: "LÍNGUA ESPANHOLA", icone: "🌎", cor: "var(--pink-icon)", jogos: [] },
-  { id: 6, area: "MATEMÁTICA E SUAS TECNOLOGIAS", nome: "MATEMÁTICA", icone: "📐", cor: "var(--blue)", jogos: [] },
-  { id: 7, area: "CIÊNCIAS DA NATUREZA E SUAS TECNOLOGIAS", nome: "BIOLOGIA", icone: "🌿", cor: "var(--orange-icon)", jogos: [] },
-  { id: 8, area: "CIÊNCIAS DA NATUREZA E SUAS TECNOLOGIAS", nome: "FÍSICA", icone: "⚛️", cor: "var(--orange-icon)", jogos: [] },
-  { id: 9, area: "CIÊNCIAS DA NATUREZA E SUAS TECNOLOGIAS", nome: "QUÍMICA", icone: "🧪", cor: "var(--orange-icon)", jogos: [] },
-  { id: 10, area: "CIÊNCIAS HUMANAS E SOCIAIS APLICADAS", nome: "HISTÓRIA", icone: "📜", cor: "var(--orange-icon)", jogos: [] },
-  { id: 11, area: "CIÊNCIAS HUMANAS E SOCIAIS APLICADAS", nome: "GEOGRAFIA", icone: "🌍", cor: "var(--orange-icon)", jogos: [] },
-  { id: 12, area: "CIÊNCIAS HUMANAS E SOCIAIS APLICADAS", nome: "FILOSOFIA", icone: "🏛️", cor: "var(--orange-icon)", jogos: [] },
-  { id: 13, area: "CIÊNCIAS HUMANAS E SOCIAIS APLICADAS", nome: "SOCIOLOGIA", icone: "👥", cor: "var(--orange-icon)", jogos: [] }
+/* =========================================
+   MEMÓRIA DE NAVEGAÇÃO E BANCO DE DADOS (V3)
+   ========================================= */
+let db;
+// Usamos a versão 3 para forçar a correção do conflito de armazenamento
+const request = indexedDB.open("ClassroomGamificationDB", 3);
+
+request.onupgradeneeded = (event) => {
+  db = event.target.result;
+  if (!db.objectStoreNames.contains("jogos")) {
+    db.createObjectStore("jogos", { keyPath: "id" });
+  }
+  if (!db.objectStoreNames.contains("progresso_alunos")) {
+    db.createObjectStore("progresso_alunos", { keyPath: "id", autoIncrement: true });
+  }
+};
+
+request.onsuccess = (event) => {
+  db = event.target.result;
+  renderizarTelaPrincipal();
+  
+  // VERIFICA SE O UTILIZADOR ESTAVA NUMA DISCIPLINA ANTES DE ATUALIZAR A PÁGINA (F5)
+  const disciplinaSalva = localStorage.getItem("disciplinaAtiva");
+  if (disciplinaSalva) {
+    abrirDisciplina(parseInt(disciplinaSalva));
+  }
+};
+
+request.onerror = (event) => {
+  console.error("Erro na base de dados:", event.target.error);
+};
+
+/* =========================================
+   ESTRUTURA DAS DISCIPLINAS
+   ========================================= */
+const disciplinas = [
+  { id: 999, area: "EXAME NACIONAL DO ENSINO MÉDIO", nome: "JOGOS ENEM", icone: "📝", cor: "var(--gold)" },
+  { id: 1, area: "LINGUAGENS E SUAS TECNOLOGIAS", nome: "LÍNGUA PORTUGUESA", icone: "💬", cor: "var(--pink-icon)" },
+  { id: 6, area: "MATEMÁTICA E SUAS TECNOLOGIAS", nome: "MATEMÁTICA", icone: "📐", cor: "var(--blue)" },
+  { id: 7, area: "CIÊNCIAS DA NATUREZA E SUAS TECNOLOGIAS", nome: "BIOLOGIA", icone: "🌿", cor: "var(--orange-icon)" },
+  { id: 10, area: "CIÊNCIAS HUMANAS E SOCIAIS APLICADAS", nome: "HISTÓRIA", icone: "📜", cor: "var(--orange-icon)" }
 ];
 
 let disciplinaAtualId = null;
 let modoDeletarAtivo = false;
+let jogosCarregados = [];
 
-// INICIALIZA A TELA PRINCIPAL
+/* =========================================
+   FUNÇÕES DA INTERFACE E LÓGICA
+   ========================================= */
 function renderizarTelaPrincipal() {
   const container = document.getElementById('tela-principal');
-  
-  // CAPA PRINCIPAL DO APP NO TOPO (SEGUNDO QUADRANTE)
   let htmlContent = `
     <div class="app-cover">
       <div class="cover-overlay">
@@ -458,44 +482,37 @@ function renderizarTelaPrincipal() {
   `;
 
   const areas = [...new Set(disciplinas.map(d => d.area))];
-
   areas.forEach(area => {
-    const disciplinasArea = disciplinas.filter(d => d.area === area);
-    if(disciplinasArea.length > 0) {
-      htmlContent += `
-        <div class="area-section">
-          <h2 class="area-title">${area}</h2>
-          <div class="grid-icones">
-            ${disciplinasArea.map(d => `
-              <div class="icone-wrapper" onclick="abrirDisciplina(${d.id})">
-                <div class="circulo-icone" style="background-color: ${d.cor};">${d.icone}</div>
-                <div class="icone-titulo">${d.nome}</div>
-              </div>
-            `).join('')}
-          </div>
+    const dArea = disciplinas.filter(d => d.area === area);
+    if(dArea.length > 0) {
+      htmlContent += `<div class="area-section"><h2 class="area-title">${area}</h2><div class="grid-icones">`;
+      htmlContent += dArea.map(d => `
+        <div class="icone-wrapper" onclick="abrirDisciplina(${d.id})">
+          <div class="circulo-icone" style="background-color: ${d.cor};">${d.icone}</div>
+          <div class="icone-titulo">${d.nome}</div>
         </div>
-      `;
+      `).join('');
+      htmlContent += `</div></div>`;
     }
   });
-
   container.innerHTML = htmlContent;
-  renderizarLixeira();
 }
 
-// NAVEGAÇÃO
 function abrirDisciplina(id) {
-  const disciplina = disciplinas.find(d => d.id === id);
-  if(!disciplina) return;
+  const d = disciplinas.find(d => d.id === id);
+  if(!d) return;
   disciplinaAtualId = id;
   modoDeletarAtivo = false;
-  document.getElementById('btn-deletar-jogo').classList.remove('btn-ativo');
   
-  document.getElementById('titulo-disciplina-atual').innerText = disciplina.nome;
-  const iconeElement = document.getElementById('icone-disciplina-atual');
-  iconeElement.innerText = disciplina.icone;
-  iconeElement.style.backgroundColor = disciplina.cor;
+  // GUARDA A DISCIPLINA NA MEMÓRIA PARA NÃO PERDER AO ATUALIZAR
+  localStorage.setItem("disciplinaAtiva", id);
+  
+  document.getElementById('titulo-disciplina-atual').innerText = d.nome;
+  const icone = document.getElementById('icone-disciplina-atual');
+  icone.innerText = d.icone;
+  icone.style.backgroundColor = d.cor;
 
-  renderizarJogos();
+  buscarJogosLocais(id);
 
   document.getElementById('tela-principal').style.display = 'none';
   document.getElementById('tela-disciplina').style.display = 'block';
@@ -503,185 +520,185 @@ function abrirDisciplina(id) {
 
 function voltarTelaPrincipal() {
   disciplinaAtualId = null;
+  localStorage.removeItem("disciplinaAtiva"); // LIMPA A MEMÓRIA AO VOLTAR AO INÍCIO
   document.getElementById('tela-disciplina').style.display = 'none';
   document.getElementById('tela-principal').style.display = 'block';
 }
 
-// RENDERIZAR JOGOS COM CAPAS
-function renderizarJogos() {
-  const containerJogos = document.getElementById('lista-jogos-container');
-  containerJogos.innerHTML = '';
+function buscarJogosLocais(disciplinaId) {
+  const transaction = db.transaction(["jogos"], "readonly");
+  const store = transaction.objectStore("jogos");
+  const request = store.getAll();
   
-  const disciplina = disciplinas.find(d => d.id === disciplinaAtualId);
-  const jogosAtivos = disciplina.jogos.filter(j => !j.excluido);
+  request.onsuccess = (event) => {
+    jogosCarregados = event.target.result.filter(j => j.disciplinaId === disciplinaId);
+    renderizarJogos();
+  };
+}
+
+function renderizarJogos() {
+  const container = document.getElementById('lista-jogos-container');
+  container.innerHTML = '';
+  const jogosAtivos = jogosCarregados.filter(j => !j.excluido);
 
   if (jogosAtivos.length === 0) {
-    containerJogos.style.display = "block";
-    containerJogos.innerHTML = '<p style="color: gray;">NENHUM JOGO CADASTRADO NESSA DISCIPLINA.</p>';
+    container.style.display = "block";
+    container.innerHTML = '<p style="color: gray;">NENHUM JOGO CADASTRADO NESSA DISCIPLINA.</p>';
     return;
   }
-
-  containerJogos.style.display = "grid";
-
+  
+  container.style.display = "grid";
   jogosAtivos.forEach(jogo => {
     const card = document.createElement('div');
     card.className = 'card-jogo';
+    if(!modoDeletarAtivo) card.onclick = () => iniciarJogo(jogo.dados);
 
-    let checkbox = '';
-    if (modoDeletarAtivo) {
-      checkbox = `<input type="checkbox" class="checkbox-deletar" onchange="confirmarDelecaoJogo(event, ${jogo.id})">`;
-    }
-
+    let checkbox = modoDeletarAtivo ? `<input type="checkbox" class="checkbox-deletar" onchange="marcarComoExcluido(event, ${jogo.id})">` : '';
     let estiloCapa = jogo.capa ? `background-image: url('${jogo.capa}');` : ``;
     let conteudoCapa = jogo.capa ? `` : `🎮`;
 
-    card.innerHTML = `
-      ${checkbox}
-      <a href="${jogo.url}" target="_blank" style="text-decoration: none; color: inherit; display: block;">
-        <div class="capa-jogo" style="${estiloCapa}">${conteudoCapa}</div>
-      </a>
-      <div class="info-jogo">
-        <a href="${jogo.url}" target="_blank">${jogo.nome}</a>
-      </div>
-    `;
-    containerJogos.appendChild(card);
+    card.innerHTML = `${checkbox}<div class="capa-jogo" style="${estiloCapa}">${conteudoCapa}</div><div class="info-jogo">${jogo.nome}</div>`;
+    container.appendChild(card);
   });
 }
 
-function alternarModoDeletar() {
-  modoDeletarAtivo = !modoDeletarAtivo;
-  const btn = document.getElementById('btn-deletar-jogo');
-  if (modoDeletarAtivo) { btn.classList.add('btn-ativo'); } else { btn.classList.remove('btn-ativo'); }
-  renderizarJogos();
+function iniciarJogo(dados) {
+  document.getElementById('modalJogar').style.display = 'flex';
+  document.getElementById('iframeJogo').src = dados; 
 }
 
-function confirmarDelecaoJogo(event, jogoId) {
-  if (event.target.checked) {
-    if (confirm("Você deseja realmente deletar esse jogo?")) {
-      const disciplina = disciplinas.find(d => d.id === disciplinaAtualId);
-      const jogo = disciplina.jogos.find(j => j.id === jogoId);
-      jogo.excluido = true;
-      renderizarJogos();
-      renderizarLixeira();
-    } else {
-      event.target.checked = false;
-    }
-  }
+function fecharJogo() {
+  document.getElementById('modalJogar').style.display = 'none';
+  document.getElementById('iframeJogo').src = ""; 
 }
 
-// ADICIONAR JOGOS
-function abrirModalAdicionarJogo() {
-  document.getElementById('modalAdicionarJogo').style.display = 'flex';
-  document.getElementById('formAdicionarJogo').reset();
-  document.getElementById('tituloModalAdicionar').innerText = "ADICIONAR NOVO JOGO";
-  alternarTipoEntradaJogo();
-}
-
-function fecharModalAdicionarJogo() {
-  document.getElementById('modalAdicionarJogo').style.display = 'none';
-}
+/* =========================================
+   ADICIONAR E CONVERTER JOGOS
+   ========================================= */
+function abrirModalAdicionarJogo() { document.getElementById('modalAdicionarJogo').style.display = 'flex'; }
+function fecharModalAdicionarJogo() { document.getElementById('modalAdicionarJogo').style.display = 'none'; }
 
 function alternarTipoEntradaJogo() {
   const tipo = document.getElementById('tipoJogo').value;
-  if (tipo === 'html_local') {
-    document.getElementById('grupoArquivoHtml').style.display = 'block';
-    document.getElementById('arquivoHtmlJogo').required = true;
-    document.getElementById('grupoLinkWeb').style.display = 'none';
-    document.getElementById('linkJogo').required = false;
-  } else {
-    document.getElementById('grupoArquivoHtml').style.display = 'none';
-    document.getElementById('arquivoHtmlJogo').required = false;
-    document.getElementById('grupoLinkWeb').style.display = 'block';
-    document.getElementById('linkJogo').required = true;
-  }
+  document.getElementById('grupoArquivoHtml').style.display = tipo === 'html_local' ? 'block' : 'none';
+  document.getElementById('grupoLinkWeb').style.display = tipo === 'link_web' ? 'block' : 'none';
 }
 
-function salvarNovoJogo(event) {
-  event.preventDefault();
+function arquivoParaBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = error => reject(error);
+    reader.readAsDataURL(file); 
+  });
+}
 
+async function salvarNovoJogo(event) {
+  event.preventDefault();
   const nome = document.getElementById('nomeJogo').value.toUpperCase();
   const tipo = document.getElementById('tipoJogo').value;
+  let dadosSalvar = "";
   
-  let arquivoUrl = "#";
   if (tipo === 'html_local') {
     const file = document.getElementById('arquivoHtmlJogo').files[0];
-    if (file) { arquivoUrl = URL.createObjectURL(file); } 
+    if (file) dadosSalvar = await arquivoParaBase64(file);
   } else {
-    arquivoUrl = document.getElementById('linkJogo').value;
+    dadosSalvar = document.getElementById('linkJogo').value;
   }
 
   const arquivoCapa = document.getElementById('capaJogo').files[0];
-  let capaUrl = "";
-  if (arquivoCapa) {
-    capaUrl = URL.createObjectURL(arquivoCapa);
-  } else if (disciplinaAtualId === 999) {
-    capaUrl = "0.png";
-  }
-
-  const disciplina = disciplinas.find(d => d.id === disciplinaAtualId);
-  const novoId = Date.now(); 
+  let capaBase64 = "";
+  if (arquivoCapa) capaBase64 = await arquivoParaBase64(arquivoCapa); 
   
-  disciplina.jogos.push({
-    id: novoId,
+  const novoJogo = {
+    id: Date.now(),
+    disciplinaId: disciplinaAtualId,
     nome: nome,
-    url: arquivoUrl,
-    capa: capaUrl,
-    excluido: false
-  });
+    tipo: tipo,
+    dados: dadosSalvar,
+    capa: capaBase64,
+    excluido: false,
+    sincronizado: false
+  };
 
-  fecharModalAdicionarJogo();
-  abrirDisciplina(disciplinaAtualId);
-  alert("Jogo cadastrado com sucesso!");
+  const transaction = db.transaction(["jogos"], "readwrite");
+  const store = transaction.objectStore("jogos");
+  store.add(novoJogo);
+
+  transaction.oncomplete = () => {
+    fecharModalAdicionarJogo();
+    buscarJogosLocais(disciplinaAtualId);
+  };
 }
 
-// LIXEIRA
-function renderizarLixeira() {
-  const containerLixeira = document.getElementById('container-lixeira');
-  containerLixeira.innerHTML = '';
-  let jogosExcluidos = [];
+/* =========================================
+   LIXEIRA E EXCLUSÃO
+   ========================================= */
+function alternarModoDeletar() {
+  modoDeletarAtivo = !modoDeletarAtivo;
+  renderizarJogos();
+}
+
+function marcarComoExcluido(event, jogoId) {
+  if (event.target.checked && confirm("Enviar jogo para a lixeira?")) {
+    const transaction = db.transaction(["jogos"], "readwrite");
+    const store = transaction.objectStore("jogos");
+    const request = store.get(jogoId);
+    
+    request.onsuccess = () => {
+      let jogo = request.result;
+      jogo.excluido = true;
+      jogo.sincronizado = false;
+      store.put(jogo);
+      buscarJogosLocais(disciplinaAtualId);
+    };
+  } else {
+    event.target.checked = false;
+  }
+}
+
+function abrirLixeira() {
+  document.getElementById('lixeiraModal').style.display = 'flex';
+  const container = document.getElementById('container-lixeira');
   
-  disciplinas.forEach(d => {
-    d.jogos.forEach(j => {
-      if (j.excluido) { jogosExcluidos.push({ disciplinaId: d.id, disciplinaNome: d.nome, jogo: j }); }
+  const transaction = db.transaction(["jogos"], "readonly");
+  const request = transaction.objectStore("jogos").getAll();
+  
+  request.onsuccess = (e) => {
+    const excluidos = e.target.result.filter(j => j.excluido);
+    container.innerHTML = excluidos.length ? '' : '<p style="color:white;text-align:center;">LIXEIRA VAZIA.</p>';
+    
+    excluidos.forEach(jogo => {
+      const d = disciplinas.find(d => d.id === jogo.disciplinaId);
+      container.innerHTML += `
+        <div style="display:flex; justify-content:space-between; background:rgba(255,255,255,0.1); padding:10px; border-radius:6px; margin-bottom:10px;">
+          <div>
+            <strong style="color:white;">🎮 ${jogo.nome}</strong><br>
+            <span style="color:gray;font-size:12px;">${d ? d.nome : ''}</span>
+          </div>
+          <button class="btn-add" style="padding:5px 10px; cursor:pointer;" onclick="reativarJogo(${jogo.id})">REATIVAR</button>
+        </div>
+      `;
     });
-  });
+  };
+}
+
+function reativarJogo(jogoId) {
+  const transaction = db.transaction(["jogos"], "readwrite");
+  const store = transaction.objectStore("jogos");
+  const request = store.get(jogoId);
   
-  if (jogosExcluidos.length === 0) {
-    containerLixeira.innerHTML = '<p style="text-align:center; width:100%;">A LIXEIRA ESTÁ VAZIA.</p>';
-    return;
-  }
-
-  jogosExcluidos.forEach(item => {
-    const div = document.createElement('div');
-    div.style = "display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.1); padding: 10px; border-radius: 6px; margin-bottom: 10px;";
-    div.innerHTML = `
-      <div>
-        <strong style="color: white; font-size: 16px;">🎮 ${item.jogo.nome}</strong><br>
-        <span style="color: gray; font-size: 12px;">CATEGORIA: ${item.disciplinaNome}</span>
-      </div>
-      <button class="btn btn-add" onclick="reativarJogo(${item.disciplinaId}, ${item.jogo.id})">REATIVAR</button>
-    `;
-    containerLixeira.appendChild(div);
-  });
-}
-
-function reativarJogo(disciplinaId, jogoId) {
-  const disciplina = disciplinas.find(d => d.id === disciplinaId);
-  const jogo = disciplina.jogos.find(j => j.id === jogoId);
-  if (jogo) {
+  request.onsuccess = () => {
+    let jogo = request.result;
     jogo.excluido = false;
-    renderizarLixeira();
-    if (disciplinaAtualId === disciplinaId && document.getElementById('tela-disciplina').style.display === 'block') {
-      renderizarJogos();
-    }
-  }
+    jogo.sincronizado = false;
+    store.put(jogo);
+    abrirLixeira();
+    if(disciplinaAtualId) buscarJogosLocais(disciplinaAtualId);
+  };
 }
 
-function abrirLixeira() { document.getElementById('lixeiraModal').style.display = 'flex'; }
 function fecharLixeira() { document.getElementById('lixeiraModal').style.display = 'none'; }
-
-// INICIA
-window.onload = renderizarTelaPrincipal;
 </script>
 </body>
 </html>
