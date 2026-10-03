@@ -4,8 +4,13 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>CLASSROOM GAMIFICATION</title>
-  <link rel="manifest" href="manifest.json">
+<link rel="manifest" href="manifest.json">
 <script src="app.js" defer></script>
+
+<!-- BIBLIOTECAS DO FIREBASE -->
+<script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore-compat.js"></script>
+
 <style>
   :root {
     --bg-color: #0d2444;
@@ -21,7 +26,6 @@
   body {
     margin: 0;
     font-family: 'Trebuchet MS', 'Segoe UI', Verdana, sans-serif;
-    /* IMAGEM ADICIONADA AO PLANO DE FUNDO GERAL */
     background: url('image_483032.jpg') no-repeat center center fixed;
     background-size: cover;
     color: var(--text-color);
@@ -58,7 +62,6 @@
     font-size: 16px;
   }
 
-  /* CAPA DO APP (HERO BANNER - SEGUNDO QUADRANTE) */
   .app-cover {
     width: 100%;
     height: 220px;
@@ -99,7 +102,6 @@
     text-shadow: 1px 1px 3px #000;
   }
 
-  /* ESTILOS DA TELA PRINCIPAL (ÍCONES) */
   .area-section {
     margin-bottom: 40px;
     background: rgba(10, 20, 40, 0.75);
@@ -159,7 +161,6 @@
     text-transform: uppercase;
   }
 
-  /* ESTILOS DA PÁGINA DA DISCIPLINA (INTERNA) */
   #tela-disciplina {
     display: none;
     background: rgba(10, 20, 40, 0.85);
@@ -209,8 +210,7 @@
 
   .btn-add { background: var(--green); }
   .btn-del { background: var(--red); }
-  .btn-ativo { border: 2px solid white; box-shadow: 0 0 10px rgba(255,255,255,0.5); }
-
+  
   .lista-jogos {
     background: rgba(13, 36, 68, 0.9);
     padding: 20px;
@@ -218,7 +218,6 @@
     border: 1px solid var(--blue);
   }
 
-  /* GRID DE JOGOS COM CAPAS */
   .grid-jogos {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
@@ -233,6 +232,7 @@
     position: relative;
     text-align: center;
     transition: transform 0.2s;
+    cursor: pointer;
   }
 
   .card-jogo:hover {
@@ -252,21 +252,7 @@
     font-size: 40px;
   }
 
-  .info-jogo {
-    padding: 10px;
-  }
-
-  .info-jogo a {
-    color: var(--gold);
-    text-decoration: none;
-    font-size: 14px;
-    font-weight: bold;
-    display: block;
-  }
-
-  .info-jogo a:hover {
-    text-decoration: underline;
-  }
+  .info-jogo { padding: 10px; font-weight: bold; font-size: 14px; }
 
   .checkbox-deletar {
     position: absolute;
@@ -278,7 +264,6 @@
     box-shadow: 0 0 5px rgba(0,0,0,0.8);
   }
 
-  /* MODAIS (LIXEIRA E ADICIONAR JOGO) */
   .modal-overlay {
     display: none;
     position: fixed;
@@ -300,37 +285,15 @@
     overflow-y: auto;
   }
 
-  .modal-content.lixeira {
-    border-color: var(--red);
-  }
+  .modal-content.lixeira { border-color: var(--red); }
 
-  .form-group {
-    margin-bottom: 15px;
-  }
-
-  .form-group label {
-    display: block;
-    margin-bottom: 5px;
-    color: var(--gold);
-    font-weight: bold;
-  }
-
+  .form-group { margin-bottom: 15px; }
+  .form-group label { display: block; margin-bottom: 5px; color: var(--gold); font-weight: bold; }
   .form-group input, .form-group select {
-    width: 100%;
-    padding: 10px;
-    border-radius: 6px;
-    border: 1px solid var(--blue);
-    background: rgba(255,255,255,0.9);
-    color: #000;
-    box-sizing: border-box;
+    width: 100%; padding: 10px; border-radius: 6px; border: 1px solid var(--blue);
+    background: rgba(255,255,255,0.9); color: #000; box-sizing: border-box;
   }
-
-  .form-group input[type="file"] {
-    background: transparent;
-    color: white;
-    border: none;
-    padding: 5px 0;
-  }
+  .form-group input[type="file"] { background: transparent; color: white; border: none; padding: 5px 0; }
 </style>
 </head>
 <body>
@@ -342,10 +305,8 @@
   </div>
 </header>
 
-<!-- TELA 1: LISTAGEM DE ÁREAS E ÍCONES -->
 <main id="tela-principal"></main>
 
-<!-- TELA 2: PÁGINA INTERNA DA DISCIPLINA -->
 <main id="tela-disciplina">
   <div class="cabecalho-disciplina">
     <button class="btn-voltar" onclick="voltarTelaPrincipal()">⬅ VOLTAR</button>
@@ -402,7 +363,7 @@
         <small style="color: #ccc; display: block; margin-top: 5px;">Se deixado em branco para o ENEM, a arte "0.png" será usada como padrão.</small>
       </div>
 
-      <button type="submit" class="btn btn-add" style="width: 100%; justify-content: center; font-size: 16px; margin-top: 10px;">💾 SALVAR JOGO</button>
+      <button id="btnSalvarJogo" type="submit" class="btn btn-add" style="width: 100%; justify-content: center; font-size: 16px; margin-top: 10px;">💾 SALVAR JOGO NA NUVEM</button>
     </form>
   </div>
 </div>
@@ -418,38 +379,34 @@
     <div id="container-lixeira"></div>
   </div>
 </div>
+
+<!-- MODAL PARA JOGAR -->
+<div id="modalJogar" class="modal-overlay">
+  <div class="modal-content" style="width: 95%; max-width: 1200px; height: 90vh; display: flex; flex-direction: column;">
+    <div style="display: flex; justify-content: space-between; border-bottom: 1px solid #fff; padding-bottom: 10px; margin-bottom: 10px;">
+      <h2 style="color: var(--gold); margin: 0;">🎮 JOGANDO</h2>
+      <button onclick="fecharJogo()" style="background: var(--red); color: white; border: 1px solid white; cursor: pointer; border-radius: 4px; font-weight: bold; padding: 5px 15px;">FECHAR JOGO [X]</button>
+    </div>
+    <iframe id="iframeJogo" style="flex: 1; width: 100%; border: none; border-radius: 8px; background: white;"></iframe>
+  </div>
+</div>
+
 <script>
 /* =========================================
-   MEMÓRIA DE NAVEGAÇÃO E BANCO DE DADOS (V3)
+   CONFIGURAÇÃO DO FIREBASE (NUVEM)
    ========================================= */
-let db;
-// Usamos a versão 3 para forçar a correção do conflito de armazenamento
-const request = indexedDB.open("ClassroomGamificationDB", 3);
-
-request.onupgradeneeded = (event) => {
-  db = event.target.result;
-  if (!db.objectStoreNames.contains("jogos")) {
-    db.createObjectStore("jogos", { keyPath: "id" });
-  }
-  if (!db.objectStoreNames.contains("progresso_alunos")) {
-    db.createObjectStore("progresso_alunos", { keyPath: "id", autoIncrement: true });
-  }
+const firebaseConfig = {
+  apiKey: "AIzaSyC8Ey7MpbQa3mVxZt8kXFRlWjfAWWlMsGg",
+  authDomain: "sistema-jogos-pessoal.firebaseapp.com",
+  projectId: "sistema-jogos-pessoal",
+  storageBucket: "sistema-jogos-pessoal.firebasestorage.app",
+  messagingSenderId: "579658852953",
+  appId: "1:579658852953:web:cb318065eebf29dff7df48"
 };
 
-request.onsuccess = (event) => {
-  db = event.target.result;
-  renderizarTelaPrincipal();
-  
-  // VERIFICA SE O UTILIZADOR ESTAVA NUMA DISCIPLINA ANTES DE ATUALIZAR A PÁGINA (F5)
-  const disciplinaSalva = localStorage.getItem("disciplinaAtiva");
-  if (disciplinaSalva) {
-    abrirDisciplina(parseInt(disciplinaSalva));
-  }
-};
-
-request.onerror = (event) => {
-  console.error("Erro na base de dados:", event.target.error);
-};
+// Inicializa o Firebase
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
 
 /* =========================================
    ESTRUTURA DAS DISCIPLINAS
@@ -469,13 +426,21 @@ let jogosCarregados = [];
 /* =========================================
    FUNÇÕES DA INTERFACE E LÓGICA
    ========================================= */
+window.onload = () => {
+  renderizarTelaPrincipal();
+  const disciplinaSalva = localStorage.getItem("disciplinaAtiva");
+  if (disciplinaSalva) {
+    abrirDisciplina(parseInt(disciplinaSalva));
+  }
+};
+
 function renderizarTelaPrincipal() {
   const container = document.getElementById('tela-principal');
   let htmlContent = `
     <div class="app-cover">
       <div class="cover-overlay">
         <h2>CLASSROOM GAMIFICATION</h2>
-        <p>Plataforma Interativa de Jogos Educacionais</p>
+        <p>Plataforma Interativa de Jogos Educacionais (Conectada à Nuvem)</p>
       </div>
     </div>
   `;
@@ -503,7 +468,6 @@ function abrirDisciplina(id) {
   disciplinaAtualId = id;
   modoDeletarAtivo = false;
   
-  // GUARDA A DISCIPLINA NA MEMÓRIA PARA NÃO PERDER AO ATUALIZAR
   localStorage.setItem("disciplinaAtiva", id);
   
   document.getElementById('titulo-disciplina-atual').innerText = d.nome;
@@ -519,20 +483,30 @@ function abrirDisciplina(id) {
 
 function voltarTelaPrincipal() {
   disciplinaAtualId = null;
-  localStorage.removeItem("disciplinaAtiva"); // LIMPA A MEMÓRIA AO VOLTAR AO INÍCIO
+  localStorage.removeItem("disciplinaAtiva");
   document.getElementById('tela-disciplina').style.display = 'none';
   document.getElementById('tela-principal').style.display = 'block';
 }
 
+/* =========================================
+   INTEGRAÇÃO FIREBASE (LEITURA E GRAVAÇÃO)
+   ========================================= */
 function buscarJogosLocais(disciplinaId) {
-  const transaction = db.transaction(["jogos"], "readonly");
-  const store = transaction.objectStore("jogos");
-  const request = store.getAll();
-  
-  request.onsuccess = (event) => {
-    jogosCarregados = event.target.result.filter(j => j.disciplinaId === disciplinaId);
+  const container = document.getElementById('lista-jogos-container');
+  container.innerHTML = '<p style="color: var(--gold);">Carregando jogos da nuvem...</p>';
+
+  db.collection("jogos").where("disciplinaId", "==", disciplinaId).get().then((querySnapshot) => {
+    jogosCarregados = [];
+    querySnapshot.forEach((doc) => {
+      let jogo = doc.data();
+      jogo.id = doc.id; // Salva o ID real do documento do Firebase
+      jogosCarregados.push(jogo);
+    });
     renderizarJogos();
-  };
+  }).catch((error) => {
+    console.error("Erro ao carregar do Firebase:", error);
+    container.innerHTML = '<p style="color: var(--red);">Erro ao carregar jogos. Verifique a conexão.</p>';
+  });
 }
 
 function renderizarJogos() {
@@ -552,7 +526,7 @@ function renderizarJogos() {
     card.className = 'card-jogo';
     if(!modoDeletarAtivo) card.onclick = () => iniciarJogo(jogo.dados);
 
-    let checkbox = modoDeletarAtivo ? `<input type="checkbox" class="checkbox-deletar" onchange="marcarComoExcluido(event, ${jogo.id})">` : '';
+    let checkbox = modoDeletarAtivo ? `<input type="checkbox" class="checkbox-deletar" onchange="marcarComoExcluido(event, '${jogo.id}')">` : '';
     let estiloCapa = jogo.capa ? `background-image: url('${jogo.capa}');` : ``;
     let conteudoCapa = jogo.capa ? `` : `🎮`;
 
@@ -594,6 +568,11 @@ function arquivoParaBase64(file) {
 
 async function salvarNovoJogo(event) {
   event.preventDefault();
+  
+  const btnSalvar = document.getElementById('btnSalvarJogo');
+  btnSalvar.innerText = "⏳ SALVANDO NA NUVEM...";
+  btnSalvar.disabled = true;
+
   const nome = document.getElementById('nomeJogo').value.toUpperCase();
   const tipo = document.getElementById('tipoJogo').value;
   let dadosSalvar = "";
@@ -610,28 +589,30 @@ async function salvarNovoJogo(event) {
   if (arquivoCapa) capaBase64 = await arquivoParaBase64(arquivoCapa); 
   
   const novoJogo = {
-    id: Date.now(),
     disciplinaId: disciplinaAtualId,
     nome: nome,
     tipo: tipo,
     dados: dadosSalvar,
     capa: capaBase64,
     excluido: false,
-    sincronizado: false
+    dataCriacao: firebase.firestore.FieldValue.serverTimestamp()
   };
 
-  const transaction = db.transaction(["jogos"], "readwrite");
-  const store = transaction.objectStore("jogos");
-  store.add(novoJogo);
-
-  transaction.oncomplete = () => {
+  db.collection("jogos").add(novoJogo).then(() => {
     fecharModalAdicionarJogo();
     buscarJogosLocais(disciplinaAtualId);
-  };
+    document.getElementById('formAdicionarJogo').reset();
+  }).catch((error) => {
+    console.error("Erro ao salvar no Firebase: ", error);
+    alert("Erro ao salvar! Se anexou um arquivo HTML, certifique-se de que ele tem menos de 1MB.");
+  }).finally(() => {
+    btnSalvar.innerText = "💾 SALVAR JOGO NA NUVEM";
+    btnSalvar.disabled = false;
+  });
 }
 
 /* =========================================
-   LIXEIRA E EXCLUSÃO
+   LIXEIRA E EXCLUSÃO (Sincronizado com Nuvem)
    ========================================= */
 function alternarModoDeletar() {
   modoDeletarAtivo = !modoDeletarAtivo;
@@ -640,17 +621,11 @@ function alternarModoDeletar() {
 
 function marcarComoExcluido(event, jogoId) {
   if (event.target.checked && confirm("Enviar jogo para a lixeira?")) {
-    const transaction = db.transaction(["jogos"], "readwrite");
-    const store = transaction.objectStore("jogos");
-    const request = store.get(jogoId);
-    
-    request.onsuccess = () => {
-      let jogo = request.result;
-      jogo.excluido = true;
-      jogo.sincronizado = false;
-      store.put(jogo);
+    db.collection("jogos").doc(jogoId).update({
+      excluido: true
+    }).then(() => {
       buscarJogosLocais(disciplinaAtualId);
-    };
+    }).catch((error) => console.error("Erro ao excluir:", error));
   } else {
     event.target.checked = false;
   }
@@ -659,42 +634,38 @@ function marcarComoExcluido(event, jogoId) {
 function abrirLixeira() {
   document.getElementById('lixeiraModal').style.display = 'flex';
   const container = document.getElementById('container-lixeira');
+  container.innerHTML = '<p style="color:white;text-align:center;">Buscando lixeira na nuvem...</p>';
   
-  const transaction = db.transaction(["jogos"], "readonly");
-  const request = transaction.objectStore("jogos").getAll();
-  
-  request.onsuccess = (e) => {
-    const excluidos = e.target.result.filter(j => j.excluido);
-    container.innerHTML = excluidos.length ? '' : '<p style="color:white;text-align:center;">LIXEIRA VAZIA.</p>';
+  db.collection("jogos").where("excluido", "==", true).get().then((querySnapshot) => {
+    if (querySnapshot.empty) {
+      container.innerHTML = '<p style="color:white;text-align:center;">LIXEIRA VAZIA.</p>';
+      return;
+    }
     
-    excluidos.forEach(jogo => {
+    container.innerHTML = '';
+    querySnapshot.forEach((doc) => {
+      let jogo = doc.data();
       const d = disciplinas.find(d => d.id === jogo.disciplinaId);
       container.innerHTML += `
         <div style="display:flex; justify-content:space-between; background:rgba(255,255,255,0.1); padding:10px; border-radius:6px; margin-bottom:10px;">
           <div>
             <strong style="color:white;">🎮 ${jogo.nome}</strong><br>
-            <span style="color:gray;font-size:12px;">${d ? d.nome : ''}</span>
+            <span style="color:gray;font-size:12px;">${d ? d.nome : 'Sem Disciplina'}</span>
           </div>
-          <button class="btn-add" style="padding:5px 10px; cursor:pointer;" onclick="reativarJogo(${jogo.id})">REATIVAR</button>
+          <button class="btn-add" style="padding:5px 10px; cursor:pointer;" onclick="reativarJogo('${doc.id}')">REATIVAR</button>
         </div>
       `;
     });
-  };
+  });
 }
 
 function reativarJogo(jogoId) {
-  const transaction = db.transaction(["jogos"], "readwrite");
-  const store = transaction.objectStore("jogos");
-  const request = store.get(jogoId);
-  
-  request.onsuccess = () => {
-    let jogo = request.result;
-    jogo.excluido = false;
-    jogo.sincronizado = false;
-    store.put(jogo);
+  db.collection("jogos").doc(jogoId).update({
+    excluido: false
+  }).then(() => {
     abrirLixeira();
     if(disciplinaAtualId) buscarJogosLocais(disciplinaAtualId);
-  };
+  }).catch((error) => console.error("Erro ao reativar:", error));
 }
 
 function fecharLixeira() { document.getElementById('lixeiraModal').style.display = 'none'; }
